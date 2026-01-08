@@ -132,3 +132,102 @@ def train_model(
   )
 
 print("SUCCESS: defining linear regression functions complete.")
+
+#@title Code - Experiment 1
+
+# The following variables are the hyperparameters.
+settings_1 = ml_edu.experiment.ExperimentSettings(
+    learning_rate = 0.001,
+    number_epochs = 20,
+    batch_size = 50,
+    input_features = ['TRIP_MILES']
+)
+
+metrics = [keras.metrics.RootMeanSquaredError(name='rmse')]
+
+model_1 = create_model(settings_1, metrics)
+
+experiment_1 = train_model('one_feature', model_1, training_df, 'FARE', settings_1)
+
+ml_edu.results.plot_experiment_metrics(experiment_1, ['rmse'])
+ml_edu.results.plot_model_predictions(experiment_1, training_df, 'FARE')
+
+#@title Code - Experiment 2
+
+# The following variables are the hyperparameters.
+# TODO - Adjust these hyperparameters to see how they impact a training run.
+settings_2 = ml_edu.experiment.ExperimentSettings(
+    learning_rate = 0.001,
+    number_epochs = 20,
+    batch_size = 500,
+    input_features = ['TRIP_MILES']
+)
+
+metrics = [keras.metrics.RootMeanSquaredError(name='rmse')]
+
+model_2 = create_model(settings_2, metrics)
+
+experiment_2 = train_model('one_feature_hyper', model_2, training_df, 'FARE', settings_2)
+
+ml_edu.results.plot_experiment_metrics(experiment_2, ['rmse'])
+ml_edu.results.plot_model_predictions(experiment_2, training_df, 'FARE')
+
+#@title Code - Experiment 3
+
+# The following variables are the hyperparameters.
+settings_3 = ml_edu.experiment.ExperimentSettings(
+    learning_rate = 0.001,
+    number_epochs = 20,
+    batch_size = 50,
+    input_features = ['TRIP_MILES', 'TRIP_MINUTES']
+)
+
+training_df['TRIP_MINUTES'] = training_df['TRIP_SECONDS']/60
+
+metrics = [keras.metrics.RootMeanSquaredError(name='rmse')]
+
+model_3 = create_model(settings_3, metrics)
+
+experiment_3 = train_model('two_features', model_3, training_df, 'FARE', settings_3)
+
+ml_edu.results.plot_experiment_metrics(experiment_3, ['rmse'])
+ml_edu.results.plot_model_predictions(experiment_3, training_df, 'FARE')
+
+#@title Code - Define functions to make predictions
+def format_currency(x):
+  return "${:.2f}".format(x)
+
+def build_batch(df, batch_size):
+  batch = df.sample(n=batch_size).copy()
+  batch.set_index(np.arange(batch_size), inplace=True)
+  return batch
+
+def predict_fare(model, df, features, label, batch_size=50):
+  batch = build_batch(df, batch_size)
+  predicted_values = model.predict_on_batch(x={name: batch[name].values for name in features})
+
+  data = {"PREDICTED_FARE": [], "OBSERVED_FARE": [], "L1_LOSS": [],
+          features[0]: [], features[1]: []}
+  for i in range(batch_size):
+    predicted = predicted_values[i][0]
+    observed = batch.at[i, label]
+    data["PREDICTED_FARE"].append(format_currency(predicted))
+    data["OBSERVED_FARE"].append(format_currency(observed))
+    data["L1_LOSS"].append(format_currency(abs(observed - predicted)))
+    data[features[0]].append(batch.at[i, features[0]])
+    data[features[1]].append("{:.2f}".format(batch.at[i, features[1]]))
+
+  output_df = pd.DataFrame(data)
+  return output_df
+
+def show_predictions(output):
+  header = "-" * 80
+  banner = header + "\n" + "|" + "PREDICTIONS".center(78) + "|" + "\n" + header
+  print(banner)
+  print(output)
+  return
+
+#@title Code - Make predictions
+
+output = predict_fare(experiment_3.model, training_df, experiment_3.settings.input_features, 'FARE')
+show_predictions(output)
